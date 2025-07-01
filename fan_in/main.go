@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 func fanIn(ctx context.Context, chs []chan int) chan int {
@@ -103,9 +104,10 @@ func main() {
 	}()
 
 	fn := func(i int) int {
-		return i * 2
+		time.Sleep(time.Second)
+		return i
 	}
-	chs := fanOut(ctx, in, 3, fn)
+	chs := fanOut(ctx, in, 10, fn)
 	out := fanIn(ctx, chs)
 
 	for i := range out {
