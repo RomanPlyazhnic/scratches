@@ -44,7 +44,7 @@ func fanIn(ctx context.Context, chs []chan int) chan int {
 	return out
 }
 
-func fanOut(ctx context.Context, in chan int, numChan int) []chan int {
+func fanOut(ctx context.Context, in chan int, numChan int, fn func(int) int) []chan int {
 	out := make([]chan int, numChan)
 	wg := &sync.WaitGroup{}
 
@@ -53,7 +53,7 @@ func fanOut(ctx context.Context, in chan int, numChan int) []chan int {
 		defer wg.Done()
 
 		for i := range numChan {
-			out[i] = pipeline(ctx, in)
+			out[i] = pipeline(ctx, in, fn)
 		}
 	}()
 	wg.Wait()
@@ -61,7 +61,7 @@ func fanOut(ctx context.Context, in chan int, numChan int) []chan int {
 	return out
 }
 
-func pipeline(ctx context.Context, in chan int) (out chan int) {
+func pipeline(ctx context.Context, in chan int, fn func(int) int) (out chan int) {
 	out = make(chan int)
 
 	go func() {
@@ -76,7 +76,13 @@ func pipeline(ctx context.Context, in chan int) (out chan int) {
 					return
 				}
 
-				out <- v
+				v = fn(v)
+
+				select {
+				case out <- v:
+				case <-ctx.Done():
+					return
+				}
 			}
 		}
 	}()
@@ -96,7 +102,10 @@ func main() {
 		close(in)
 	}()
 
-	chs := fanOut(ctx, in, 3)
+	fn := func(i int) int {
+		return i * 2
+	}
+	chs := fanOut(ctx, in, 3, fn)
 	out := fanIn(ctx, chs)
 
 	for i := range out {
