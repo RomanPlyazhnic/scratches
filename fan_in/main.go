@@ -6,13 +6,13 @@ import (
 	"sync"
 )
 
-func fanIn(ctx context.Context, chans []chan int) chan int {
+func fanIn(ctx context.Context, chs []chan int) chan int {
 	out := make(chan int)
 
 	wg := &sync.WaitGroup{}
 
 	go func() {
-		for _, ch := range chans {
+		for _, ch := range chs {
 			wg.Add(1)
 
 			go func() {
@@ -26,7 +26,12 @@ func fanIn(ctx context.Context, chans []chan int) chan int {
 						if !ok {
 							return
 						}
-						out <- i
+
+						select {
+						case out <- i:
+						case <-ctx.Done():
+							return
+						}
 					}
 				}
 			}()
@@ -40,25 +45,27 @@ func fanIn(ctx context.Context, chans []chan int) chan int {
 }
 
 func main() {
-	chans := make([]chan int, 3)
+	var chs []chan int
+
+	for range 3 {
+		chs = append(chs, make(chan int))
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	go func() {
-		for _, ch := range chans {
-			ch = make(chan int)
-
+		for i := range 3 {
 			go func() {
-				for i := 0; i < 5; i++ {
-					ch <- i
+				for j := 0; j < 5; j++ {
+					chs[i] <- j
 				}
-				close(ch)
+				close(chs[i])
 			}()
 		}
 	}()
 
-	out := fanIn(ctx, chans)
+	out := fanIn(ctx, chs)
 
 	for i := range out {
 		fmt.Println(i)
