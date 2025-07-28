@@ -96,6 +96,8 @@ func main() {
 	defer cancel()
 
 	in := make(chan int)
+	fmt.Println("len", len(in))
+	fmt.Println("cap", cap(in))
 	go func() {
 		for i := 0; i < 10; i++ {
 			in <- i
